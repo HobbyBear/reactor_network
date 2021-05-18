@@ -10,7 +10,8 @@ import (
 type Server struct {
 	ListenerPoll *poll.Poll
 	// todo 做成数组
-	WPoll *poll.Poll
+	WPoll          *poll.Poll
+	ConnectionPoll map[int]*Connection
 }
 
 func New(network string, addr string) *Server {
@@ -54,7 +55,8 @@ func (s *Server) Start() {
 				log.Fatal("set nonblock:", err)
 				return
 			}
-
+			conn := NewConn(nfd)
+			s.ConnectionPoll[nfd] = conn
 			s.WPoll.AddReadEvent(nfd)
 		}
 	})
@@ -62,21 +64,13 @@ func (s *Server) Start() {
 	// connection 对数据进行读写
 	go s.WPoll.RunLoop(func(fd int, events poll.Event) {
 		if events&poll.EventRead != 0 {
-			buf := make([]byte, 1024)
-			// todo 拆包
-			n, err := unix.Read(fd, buf)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			// todo 粘包
-			_, err = unix.Write(fd, buf[:n])
-			if err != nil {
-				log.Fatal(err)
+			if conn, ok := s.ConnectionPoll[fd]; ok {
+				conn.handleRead()
 			}
 		}
 
 		if events&poll.EventErr != 0 {
+			// todo conn closed
 			err := unix.Close(fd)
 			if err != nil {
 				log.Fatal(err)
@@ -84,7 +78,9 @@ func (s *Server) Start() {
 		}
 
 		if events&poll.EventWrite != 0 {
-
+			if conn, ok := s.ConnectionPoll[fd]; ok {
+				conn.handleWrite()
+			}
 		}
 
 	})
