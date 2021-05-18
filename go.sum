@@ -2,6 +2,7 @@ github.com/Allenxuxu/eviop v0.0.0-20190901123806-035c218f739a/go.mod h1:I5+IvzRy
 github.com/Allenxuxu/gev v0.2.2 h1:0EYOoqh324R4NGcBUZBxfCCUoUB69gS51ZvDbx4rC8o=
 github.com/Allenxuxu/gev v0.2.2/go.mod h1:BUQQJ0djhzf5M+YtivF5oDVBu4zyFU4/i9SxZHcFogg=
 github.com/Allenxuxu/ringbuffer v0.0.0-20190803184500-fa400f2fe92b/go.mod h1:9Rg4D7ixiHGlU50BJWJEg6vwDFcGiOYKQFcHK6Vx9m4=
+github.com/Allenxuxu/ringbuffer v0.0.9 h1:KxG2kqM1iCL0VqTTuQS6XqugoffP8IM7YhVnzEPf8cc=
 github.com/Allenxuxu/ringbuffer v0.0.9/go.mod h1:F2Ela+/miJmKYwnXr3X0+spOmSEwL/iFAEzeUJ4SFMI=
 github.com/Allenxuxu/toolkit v0.0.1/go.mod h1:kamv5tj0iNT29zmKIYaxoIcYgDnzerxnOZiHBKbVp/o=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=

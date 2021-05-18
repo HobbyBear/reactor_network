@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"golang.org/x/sys/unix"
 	"log"
 	"net"
@@ -21,8 +22,9 @@ func New(network string, addr string) *Server {
 		s        *Server
 	)
 	s = &Server{
-		ListenerPoll: poll.Create(),
-		WPoll:        poll.Create(),
+		ListenerPoll:   poll.Create(),
+		WPoll:          poll.Create(),
+		ConnectionPoll: make(map[int]*Connection),
 	}
 	listener, err = net.Listen(network, addr)
 	l, _ := listener.(*net.TCPListener)
@@ -57,15 +59,21 @@ func (s *Server) Start() {
 			}
 			conn := NewConn(nfd)
 			s.ConnectionPoll[nfd] = conn
+			log.Println(fmt.Sprintf("%d 三次握手完成", nfd))
 			s.WPoll.AddReadEvent(nfd)
 		}
 	})
 
 	// connection 对数据进行读写
 	go s.WPoll.RunLoop(func(fd int, events poll.Event) {
+		log.Println("sub reactor receive data", fd, events&poll.EventRead, events&poll.EventWrite)
+
 		if events&poll.EventRead != 0 {
 			if conn, ok := s.ConnectionPoll[fd]; ok {
 				conn.handleRead()
+				if conn.writeBuf.Len() > 0 {
+					s.WPoll.EnableWriteEvent(fd)
+				}
 			}
 		}
 
@@ -75,11 +83,15 @@ func (s *Server) Start() {
 			if err != nil {
 				log.Fatal(err)
 			}
+			log.Println(fmt.Sprintf("%d 关闭了链接", fd))
 		}
 
 		if events&poll.EventWrite != 0 {
 			if conn, ok := s.ConnectionPoll[fd]; ok {
-				conn.handleWrite()
+				if conn.writeBuf.Len() > 0 {
+					conn.handleWrite()
+				}
+				s.WPoll.EnableRead(fd)
 			}
 		}
 

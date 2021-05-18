@@ -1,10 +1,10 @@
 package poll
 
 import (
-	"fmt"
 	"github.com/Allenxuxu/gev/log"
 	"golang.org/x/sys/unix"
 	"runtime"
+	"sync"
 )
 
 // Event poller 返回事件
@@ -23,7 +23,9 @@ type SocketHandler interface {
 }
 
 type Poll struct {
-	fd               int
+	fd      int
+	sockets sync.Map // [fd]events
+
 }
 
 // init epoll
@@ -34,7 +36,8 @@ func Create() *Poll {
 	}
 
 	return &Poll{
-		fd: fd,
+		fd:      fd,
+		sockets: sync.Map{},
 	}
 
 }
@@ -65,7 +68,6 @@ func (p *Poll) RunLoop(handler func(fd int, event Event)) error {
 				var rEvents Event
 				if (events[i].Flags&unix.EV_ERROR != 0) || (events[i].Flags&unix.EV_EOF != 0) {
 					rEvents |= EventErr
-					fmt.Println(rEvents)
 				}
 				if events[i].Filter == unix.EVFILT_WRITE && events[i].Flags&unix.EV_ENABLE != 0 {
 					rEvents |= EventWrite
@@ -86,11 +88,45 @@ func (p *Poll) RunLoop(handler func(fd int, event Event)) error {
 
 // add read
 func (p *Poll) AddReadEvent(fd int) {
+	p.sockets.Store(fd, EventRead)
 	kEvents := p.kEvents(EventNone, EventRead, fd)
 	_, err := unix.Kevent(p.fd, kEvents, nil, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+// add read
+func (p *Poll) EnableWriteEvent(fd int) {
+	oldEvents, ok := p.sockets.Load(fd)
+	if !ok {
+		log.Fatal("sync map load error")
+	}
+
+	newEvents := EventWrite | EventRead
+	kEvents := p.kEvents(oldEvents.(Event), newEvents, fd)
+	_, err := unix.Kevent(p.fd, kEvents, nil, nil)
+	if err != nil {
+		log.Fatal("写入崩溃", err)
+	}
+	p.sockets.Store(fd, newEvents)
+}
+
+// EnableRead 修改fd注册事件为可读事件
+func (p *Poll) EnableRead(fd int) {
+	oldEvents, ok := p.sockets.Load(fd)
+	if !ok {
+		log.Fatal("sync map load error")
+	}
+
+	newEvents := EventRead
+	kEvents := p.kEvents(oldEvents.(Event), newEvents, fd)
+	_, err := unix.Kevent(p.fd, kEvents, nil, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	p.sockets.Store(fd, newEvents)
+
 }
 
 func (p *Poll) kEvents(old Event, new Event, fd int) (ret []unix.Kevent_t) {
